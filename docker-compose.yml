@@ -7,7 +7,7 @@ services:
       - ./mcp.config.json:/app/mcp.config.json:ro
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]
+      test: ["CMD-SHELL", "kill -0 1 || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 3
