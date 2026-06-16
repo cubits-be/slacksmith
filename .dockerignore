@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.git/
+.gitignore
+.env
+agents/*/.env
+agents/*/daily/
+agents/*/notes/
+agents/tmp/
+memory/
+.DS_Store
+*.log

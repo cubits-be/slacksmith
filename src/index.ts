@@ -24,7 +24,18 @@ function loadAgents(services: SharedServices): SlacksmithAgent[] {
     const cfgPath = path.join(config.agentsDir, id, 'agent.json');
     if (!fs.existsSync(cfgPath)) continue;
 
-    const agentCfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')) as AgentFileConfig;
+    let agentCfg: AgentFileConfig;
+    try {
+      agentCfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')) as AgentFileConfig;
+    } catch (err) {
+      console.warn(`[${id}] Invalid JSON in agent.json: ${err instanceof Error ? err.message : err}`);
+      continue;
+    }
+
+    if (!agentCfg.name) {
+      console.warn(`[${id}] Skipping — agent.json missing required field 'name'. Example: { "name": "MyBot" }`);
+      continue;
+    }
 
     // Load agent-local .env (preferred), fall back to root .env convention
     let botToken: string | undefined;
@@ -76,7 +87,9 @@ async function main(): Promise<void> {
   const agents = loadAgents(services);
 
   if (agents.length === 0) {
-    console.error('No agents configured. Add an agents/<id>/agent.json and set SLACK_BOT_TOKEN_<ID> + SLACK_APP_TOKEN_<ID> in .env');
+    console.error(
+      'No agents configured. Create agents/<id>/agent.json with { "name": "MyBot" } and set SLACK_BOT_TOKEN_<ID> + SLACK_APP_TOKEN_<ID> in agents/<id>/.env',
+    );
     process.exit(1);
   }
 

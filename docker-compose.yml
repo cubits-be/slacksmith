@@ -6,3 +6,9 @@ services:
       - ./agents:/app/agents
       - ./mcp.config.json:/app/mcp.config.json:ro
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
