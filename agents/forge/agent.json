@@ -1,0 +1,4 @@
+{
+  "name": "Forge",
+  "excludedTools": ["fs__*", "github__*", "bitbucket__*", "sentry__*", "slack__*"]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "DevBot",
+  "model": "gpt-4o-mini",
+  "allowedTools": [
+    "github__issue_read",
+    "github__issue_write",
+    "github__list_issues",
+    "github__search_issues",
+    "github__add_issue_comment",
+    "github__list_pull_requests",
+    "github__search_pull_requests",
+    "github__pull_request_read",
+    "github__list_commits",
+    "github__get_commit",
+    "github__get_file_contents",
+    "github__search_code",
+    "sentry__find_organizations",
+    "sentry__find_projects",
+    "sentry__search_issues",
+    "sentry__search_issue_events",
+    "sentry__search_events",
+    "sentry__get_sentry_resource",
+    "sentry__update_issue",
+    "sentry__analyze_issue_with_seer"
+  ]
+}
+

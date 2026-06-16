@@ -1,0 +1,22 @@
+{
+  "name": "slacksmith",
+  "version": "1.0.0",
+  "description": "Personal Slack interface for LLMs and MCP tools",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@slack/bolt": "^4.7.2",
+    "dotenv": "^16.4.5",
+    "openai": "^4.52.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.5.0"
+  }
+}

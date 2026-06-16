@@ -1,0 +1,65 @@
+# Slack App Manifest Template for Slacksmith agents
+#
+# Usage:
+#   1. Go to https://api.slack.com/apps → "Create New App" → "From a manifest"
+#   2. Copy this file, replace DISPLAY_NAME and BOT_USERNAME with your agent's name
+#      e.g. DISPLAY_NAME: "DevBot"  BOT_USERNAME: "devbot"
+#   3. Create the app, then:
+#      - Under "Basic Information" → grab the App Token (xapp-) after enabling Socket Mode
+#      - Under "OAuth & Permissions" → install to workspace → grab the Bot Token (xoxb-)
+#   4. Add both tokens to .env:
+#      SLACK_BOT_TOKEN_<ID>=xoxb-...
+#      SLACK_APP_TOKEN_<ID>=xapp-...
+#   5. Add an agents/<id>/agent.json with at minimum: { "name": "YourAgentName" }
+
+display_information:
+  name: DISPLAY_NAME
+  description: Slacksmith agent
+
+features:
+  bot_user:
+    display_name: DISPLAY_NAME
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      # Messaging
+      - chat:write          # post messages
+      - chat:write.public   # post to channels without being a member
+      - im:write            # open DM conversations (for proactive messages)
+      - im:history          # read DMs (required for message.im events)
+      - im:read             # list DMs
+
+      # Channels (for app_mention)
+      - channels:history    # read channel messages
+      - channels:read       # list channels
+      - groups:history      # private channel messages
+      - groups:read         # list private channels
+
+      # Users
+      - users:read          # look up user info
+
+      # Files (for long responses uploaded as attachments)
+      - files:write
+
+      # Reactions (used by MCP slack tools)
+      - reactions:write
+      - reactions:read
+
+      - app_mentions:read
+
+settings:
+  event_subscriptions:
+    bot_events:
+      - message.im          # direct messages to the bot
+      - app_mention         # @mentions in channels
+
+  interactivity:
+    is_enabled: false
+
+  org_deploy_enabled: false
+
+  socket_mode_enabled: true  # required — Slacksmith uses Socket Mode (no public URL needed)
+
+  token_rotation_enabled: false

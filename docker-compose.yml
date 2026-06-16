@@ -1,0 +1,8 @@
+services:
+  slacksmith:
+    build: .
+    env_file: .env
+    volumes:
+      - ./agents:/app/agents
+      - ./mcp.config.json:/app/mcp.config.json:ro
+    restart: unless-stopped

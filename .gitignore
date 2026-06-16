@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+agents/*/.env
+
+# Runtime state — agent-written, not source-controlled
+agents/*/STATE.json
+agents/*/daily/
+agents/tmp/
+memory/
+
+# Logs
+*.log
