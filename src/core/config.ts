@@ -5,6 +5,12 @@ import { McpConfig } from './types';
 
 dotenv.config();
 
+function validateRequired(name: string, value: string): void {
+  if (!value || value.trim() === '') {
+    throw new Error(`${name} is required — add it to .env`);
+  }
+}
+
 export const config = {
   llm: {
     apiKey: process.env.OPENAI_API_KEY ?? '',
@@ -16,8 +22,18 @@ export const config = {
 };
 
 export function loadMcpConfig(): McpConfig {
+  validateRequired('OPENAI_API_KEY', config.llm.apiKey);
+  validateRequired('SLACK_USER_ID', config.slackUserId);
+
   if (!fs.existsSync(config.mcpConfigPath)) {
     return { servers: [] };
   }
-  return JSON.parse(fs.readFileSync(config.mcpConfigPath, 'utf8')) as McpConfig;
+
+  const raw = fs.readFileSync(config.mcpConfigPath, 'utf8');
+  const substituted = raw.replace(/\$\{([^}]+)\}/g, (match, key) => {
+    const [envKey, defaultVal] = key.split(':-');
+    return process.env[envKey.trim()] ?? defaultVal ?? match;
+  });
+
+  return JSON.parse(substituted) as McpConfig;
 }

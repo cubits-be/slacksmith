@@ -2,7 +2,7 @@
   "servers": [
     {
       "name": "mcp-hub",
-      "url": "http://192.168.1.11:50500/mcp"
+      "url": "${MCP_SERVER_URL:-http://localhost:50500/mcp}"
     }
   ],
   "globalExcludedTools": ["slack__*"]
