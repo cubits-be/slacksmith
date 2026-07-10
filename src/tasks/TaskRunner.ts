@@ -167,10 +167,16 @@ export class TaskRunner {
       if (!isDue(task, lastRun, now)) continue;
 
       console.log(`[${this.agentName}] Task due: ${task.name} → ${task.action}`);
+      // Record the fire BEFORE awaiting execution so this occurrence counts as
+      // done even if execution throws (LLM error, circuit breaker, Slack API
+      // hiccup) or the process crashes mid-run. Otherwise lastRun never advances
+      // and the task re-fires on every tick until it happens to succeed — the
+      // storm that spammed #daily-summary. Trade-off: a failed run is skipped
+      // until the next scheduled occurrence rather than retried.
+      state[task.name] = now.toISOString();
+      this.writeState(state);
       try {
         await this.execute(task.action);
-        state[task.name] = now.toISOString();
-        this.writeState(state); // persist after each task in case of crash
       } catch (err) {
         console.error(`[${this.agentName}] Task execution failed (${task.name}):`, err);
       }
