@@ -12,13 +12,33 @@ interface ParsedTask {
   action: string;
   intervalMs?: number;
   dailyTime?: { hour: number; minute: number };
+  weeklyTime?: { weekday: number; hour: number; minute: number };
 }
 
 type StateMap = Record<string, string>; // task name → ISO last-run timestamp
 
+/** Weekday name (and common abbreviations) → JS getDay() index (Sunday = 0). */
+const WEEKDAYS: Record<string, number> = {
+  sunday: 0, sun: 0,
+  monday: 1, mon: 1,
+  tuesday: 2, tue: 2, tues: 2,
+  wednesday: 3, wed: 3,
+  thursday: 4, thu: 4, thur: 4, thurs: 4,
+  friday: 5, fri: 5,
+  saturday: 6, sat: 6,
+};
+
 // ─── Schedule parser ─────────────────────────────────────────────────────────
 
-function parseSchedule(schedule: string): Pick<ParsedTask, 'intervalMs' | 'dailyTime'> {
+/** Parse HH:MM, returning null if out of range (so it surfaces as invalid). */
+function parseHM(h: string, m: string): { hour: number; minute: number } | null {
+  const hour = parseInt(h, 10);
+  const minute = parseInt(m, 10);
+  if (hour > 23 || minute > 59) return null;
+  return { hour, minute };
+}
+
+function parseSchedule(schedule: string): Pick<ParsedTask, 'intervalMs' | 'dailyTime' | 'weeklyTime'> {
   const minuteMatch = schedule.match(/every\s+(\d+)\s*m(?:in(?:utes?)?)?(?:\s|$)/i);
   if (minuteMatch) return { intervalMs: parseInt(minuteMatch[1]) * 60_000 };
 
@@ -28,8 +48,19 @@ function parseSchedule(schedule: string): Pick<ParsedTask, 'intervalMs' | 'daily
   const dayMatch = schedule.match(/every\s+(\d+)\s*d(?:ays?)?(?:\s|$)/i);
   if (dayMatch) return { intervalMs: parseInt(dayMatch[1]) * 86_400_000 };
 
+  // weekly on a named day: "weekly friday 09:00" / "every sunday 12:00"
+  const weeklyMatch = schedule.match(/(?:weekly|every)\s+([a-z]+)\s+(\d{1,2}):(\d{2})/i);
+  if (weeklyMatch) {
+    const weekday = WEEKDAYS[weeklyMatch[1].toLowerCase()];
+    const hm = parseHM(weeklyMatch[2], weeklyMatch[3]);
+    if (weekday !== undefined && hm) return { weeklyTime: { weekday, ...hm } };
+  }
+
   const dailyMatch = schedule.match(/daily(?:\s+at)?\s+(\d{1,2}):(\d{2})/i);
-  if (dailyMatch) return { dailyTime: { hour: parseInt(dailyMatch[1]), minute: parseInt(dailyMatch[2]) } };
+  if (dailyMatch) {
+    const hm = parseHM(dailyMatch[1], dailyMatch[2]);
+    if (hm) return { dailyTime: hm };
+  }
 
   return {};
 }
@@ -41,16 +72,39 @@ function parseSchedule(schedule: string): Pick<ParsedTask, 'intervalMs' | 'daily
 //   schedule: every 1h   (or: every 30m / every 2h / daily 18:00)
 //   action: Send me a short joke
 
-function parseTasksFile(content: string): ParsedTask[] {
+const SCHEDULE_HELP =
+  'Use "every 30m", "every 2h", "every 1d", "daily 18:00", or "weekly friday 09:00".';
+
+interface ParseResult {
+  tasks: ParsedTask[];
+  /** Human-readable problems (unrecognized schedule, incomplete block). */
+  errors: string[];
+}
+
+function parseTasksFile(content: string): ParseResult {
   const tasks: ParsedTask[] = [];
+  const errors: string[] = [];
   let name = '';
   let scheduleStr = '';
   let actionStr = '';
 
   const push = () => {
-    if (!name || !scheduleStr || !actionStr) return;
-    const task: ParsedTask = { name, action: actionStr, ...parseSchedule(scheduleStr) };
-    if (task.intervalMs !== undefined || task.dailyTime) tasks.push(task);
+    if (!name) return;
+    // A block with a name but only part of schedule/action is a likely typo —
+    // surface it rather than silently dropping the task.
+    if (!scheduleStr || !actionStr) {
+      if (scheduleStr || actionStr) {
+        errors.push(`Task "${name}" is missing its ${!scheduleStr ? 'schedule:' : 'action:'} line.`);
+      }
+      name = scheduleStr = actionStr = '';
+      return;
+    }
+    const sched = parseSchedule(scheduleStr);
+    if (sched.intervalMs === undefined && !sched.dailyTime && !sched.weeklyTime) {
+      errors.push(`Task "${name}" has an unrecognized schedule "${scheduleStr}". ${SCHEDULE_HELP}`);
+    } else {
+      tasks.push({ name, action: actionStr, ...sched });
+    }
     name = scheduleStr = actionStr = '';
   };
 
@@ -61,14 +115,15 @@ function parseTasksFile(content: string): ParsedTask[] {
     else if (/^action:/i.test(t)) actionStr = t.replace(/^action:\s*/i, '').trim();
   }
   push();
-  return tasks;
+  return { tasks, errors };
 }
 
 /** Returns null if valid, or an error string describing what's wrong. */
 export function validateTasksContent(content: string): string | null {
-  const tasks = parseTasksFile(content);
+  const { tasks, errors } = parseTasksFile(content);
+  if (errors.length > 0) return errors.join(' ');
   if (tasks.length === 0 && content.includes('##')) {
-    return 'No valid tasks found. Each task needs ## name, schedule:, and action: lines with a recognised schedule format.';
+    return `No valid tasks found. Each task needs ## name, schedule:, and action: lines. ${SCHEDULE_HELP}`;
   }
   return null;
 }
@@ -87,6 +142,15 @@ function isDue(task: ParsedTask, lastRun: Date | null, now: Date): boolean {
     if (now < scheduledToday) return false; // not yet today
     if (!lastRun) return true;
     return lastRun < scheduledToday; // ran before today's scheduled slot
+  }
+  if (task.weeklyTime) {
+    const { weekday, hour, minute } = task.weeklyTime;
+    if (now.getDay() !== weekday) return false; // not the scheduled day
+    const scheduledToday = new Date(now);
+    scheduledToday.setHours(hour, minute, 0, 0);
+    if (now < scheduledToday) return false; // day matches, but time not reached
+    if (!lastRun) return true;
+    return lastRun < scheduledToday; // ran before this week's scheduled slot
   }
   return false;
 }
@@ -156,7 +220,10 @@ export class TaskRunner {
     const tasksContent = this.readTasks();
     if (!tasksContent.trim()) return;
 
-    const tasks = parseTasksFile(tasksContent);
+    const { tasks, errors } = parseTasksFile(tasksContent);
+    for (const err of errors) {
+      console.warn(`[${this.agentName}] TASKS.md: ${err}`);
+    }
     if (tasks.length === 0) return;
 
     const state = this.readState();
